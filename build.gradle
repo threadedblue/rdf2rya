@@ -1,0 +1,147 @@
+apply plugin: 'application'
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'maven'
+
+applicationName = 'rdf2rya'
+sourceCompatibility = 1.8
+mainClassName = 'iox.rdf2rya.RDF2RYADriver'
+group = 'iox.rdf'
+version = '0.0.1'
+
+def jarFile = buildDir.name + "/libs/" + applicationName + "-" + version + ".jar"
+configure(install.repositories.mavenInstaller) {
+    pom.project {
+        groupId group
+        artifactId 'rdf2rya.mr'
+        inceptionYear '2018'
+        packaging 'jar'
+    }
+}
+
+clean {
+    delete "${buildDir}" 
+    delete "${applicationName}" 
+}
+
+task(runSimple, dependsOn: 'classes', type: JavaExec) {
+	main = 'rdf2rya.mr.RDF2RYADriver'
+	classpath = sourceSets.main.runtimeClasspath
+}
+
+repositories {
+    jcenter()
+    maven {url 'file://' + new File(System.getProperty('user.home'), '.m2/repository').absolutePath;}
+}
+    
+sourceSets {
+    main {
+        java {
+            srcDirs 'src/main/java'
+            srcDirs 'gen/main/java'
+         }
+    }
+    test {
+        java {
+            srcDirs 'src/test/java'
+         }
+    }
+}
+
+dependencies {
+
+    compile "iox.accumulo:accumulo-provider:0.0.7"
+    compile "args4j:args4j:2.33"
+    
+    // RYA
+    compile "org.apache.rya:rya.sail:${ryaver}"
+    compile "org.apache.rya:accumulo.rya:${ryaver}"
+    compile "org.apache.rya:rya.mapreduce:${ryaver}"
+//    compile "org.apache.rya:rya.prospector:${ryaver}"
+     compile "org.apache.avro:avro:1.7.7"
+     
+	// RDF4J
+	compile "org.openrdf.sesame:sesame-queryresultio-text:${rdfver}"
+//    compile "org.eclipse.rdf4j:rdf4j-runtime:${rdfver}"     
+//    compile "org.eclipse.xtext:org.eclipse.xtext:${xtextver}"
+//	compile "org.eclipse.xtext:org.eclipse.xtext.xbase:${xtextver}"
+
+	// Logging
+    compile "org.apache.logging.log4j:log4j-slf4j-impl:${logver}" 
+    
+    compile "org.apache.accumulo:accumulo-core:${accver}"
+    compile "org.apache.accumulo:accumulo-fate:${accver}"
+    compile "org.apache.accumulo:accumulo-start:${accver}"
+    compile "org.apache.accumulo:accumulo-trace:${accver}"
+    compile "org.apache.hadoop:hadoop-client:${hadver}"
+    compile "org.apache.zookeeper:zookeeper:${zoover}"
+
+    compile group: 'commons-collections', name: 'commons-collections', version: '3.2'
+   testCompile group: 'junit', name: 'junit', version: '4.+'
+}
+
+test {
+    systemProperties 'property': 'value'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src/main/java'
+        }
+        resources {
+            srcDir 'src/main/resources'
+        }
+    }
+    main {
+    	java {
+    		srcDir 'gen/main/java'
+    	}
+    }
+}
+
+uploadArchives {
+    repositories {
+       flatDir {
+           dirs 'repos'
+       }
+    }
+}
+
+task copy2Lib(type: Copy) {
+    into "lib"
+    from configurations.runtime
+}
+//  build.dependsOn(copyToLib)
+
+task assemblex {
+    dependsOn jar
+    inputs.file jarFile
+    outputs.dir applicationName
+   doLast{ 
+      copy {
+            from "${buildDir}/libs"
+            into "${applicationName}"
+            fileMode = 0777
+        }
+       copy {
+            from "conf/"
+            into "${applicationName}/conf"
+        }
+       copy {
+            from configurations.runtime
+            into "$applicationName/lib"
+        }
+   }
+}
+
+jar {
+    // Keep jar clean:
+    exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'META-INF/*.MF'
+    manifest {
+        attributes ('Implementation-Title' : 'EMF 2 RDF 3',
+                   'Implementation-Version': version,
+                   'Main-Class': mainClassName,
+                   'Class-Path': ' lib/' + configurations.runtime.collect { it.getName() }.join(' lib/'))
+        }
+}
